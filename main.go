@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"strings"
 )
 
 // Command represents a project command with description
@@ -38,7 +39,8 @@ var (
 	titleStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#FF75B7")).
-		MarginBottom(1)
+		MarginBottom(1).
+		SetString("distructions")
 
 	itemStyle = lipgloss.NewStyle().
 		PaddingLeft(4)
@@ -75,7 +77,7 @@ func (g *ConfigGenerator) Generate() error {
 	}
 
 	config := Config{
-		ProjectName: filepath.Base(g.projectRoot),
+		ProjectName: getRepoName(),
 		Commands:    []Command{},
 	}
 
@@ -285,6 +287,29 @@ func (m Model) View() string {
 	s += "\nPress q to quit.\n"
 
 	return s
+}
+
+func getRepoName() string {
+	// Try to get the remote origin URL
+	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	output, err := cmd.Output()
+	if err == nil {
+		// Clean the URL and get the last part
+		url := strings.TrimSpace(string(output))
+		url = strings.TrimSuffix(url, ".git")
+		parts := strings.Split(url, "/")
+		if len(parts) > 0 {
+			return parts[len(parts)-1]
+		}
+	}
+
+	// Fallback: try to get the directory name
+	dir, err := os.Getwd()
+	if err == nil {
+		return filepath.Base(dir)
+	}
+
+	return "Unknown Project"
 }
 
 func main() {

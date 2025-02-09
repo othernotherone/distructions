@@ -1,4 +1,4 @@
-module projectcommands
+module distructions
 
 go 1.23.5
 
