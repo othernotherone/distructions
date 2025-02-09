@@ -34,24 +34,26 @@ type Model struct {
 	selected   map[int]struct{}
 	quitting   bool
 	err        error
+	width      int
+	height     int
 }
 
 var (
-	// Colors
-	subtle    = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
-	highlight = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	special   = lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}
+	// Colors - using simple hex colors
+	subtle    = "#383838"
+	highlight = "#7D56F4"
+	special   = "#73F59F"
 
 	// Borders and boxes
 	boxStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(highlight).
+		BorderForeground(lipgloss.Color(highlight)).
 		Padding(1).
 		MarginBottom(1)
 
 	titleStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(special).
+		Foreground(lipgloss.Color(special)).
 		MarginLeft(2).
 		MarginBottom(1).
 		PaddingLeft(2).
@@ -62,15 +64,15 @@ var (
 
 	selectedItemStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(highlight).
+		Foreground(lipgloss.Color(highlight)).
 		PaddingLeft(2)
 
 	descriptionStyle = lipgloss.NewStyle().
-		Foreground(subtle).
+		Foreground(lipgloss.Color(subtle)).
 		PaddingLeft(6)
 
 	footerStyle = lipgloss.NewStyle().
-		Foreground(subtle).
+		Foreground(lipgloss.Color(subtle)).
 		Align(lipgloss.Center).
 		MarginTop(1)
 
@@ -244,6 +246,8 @@ func initialModel() Model {
 		config:   config,
 		selected: make(map[int]struct{}),
 		err:      err,
+		width:    100, // Default width
+		height:   30,  // Default height
 	}
 }
 
@@ -291,6 +295,10 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -305,7 +313,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter":
-			// Execute the selected command
 			if m.cursor < len(m.config.Commands) {
 				cmd := m.config.Commands[m.cursor].Command
 				return m, tea.ExecProcess(exec.Command("sh", "-c", cmd), nil)
@@ -387,6 +394,14 @@ func getRepoName() string {
 	}
 
 	return "Unknown Project"
+}
+
+// Helper function for Go versions before 1.21 (remove if using Go 1.21+)
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func main() {

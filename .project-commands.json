@@ -1,25 +1,20 @@
 {
-    "projectName": "My Awesome Project",
+    "projectName": "distructions",
     "commands": [
         {
-            "name": "Run Development Server",
-            "command": "npm run dev",
-            "description": "Starts the development server on port 3000"
+            "name": "Go: Run",
+            "command": "go run .",
+            "description": "Run the Go application"
         },
         {
-            "name": "Run Tests",
-            "command": "npm test",
-            "description": "Runs the test suite"
+            "name": "Go: Test",
+            "command": "go test ./...",
+            "description": "Run all tests"
         },
         {
-            "name": "Build",
-            "command": "npm run build",
-            "description": "Creates a production build"
-        },
-        {
-            "name": "Deploy",
-            "command": "npm run deploy",
-            "description": "Deploys to production"
+            "name": "Go: Build",
+            "command": "go build",
+            "description": "Build the Go application"
         }
     ]
-} 
+}
