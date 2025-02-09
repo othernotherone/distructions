@@ -6,12 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"bufio"
 	"gopkg.in/yaml.v3"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"strings"
-	"bufio"
 )
 
 // Command represents a project command with description
@@ -37,23 +37,53 @@ type Model struct {
 }
 
 var (
+	// Colors
+	subtle    = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
+	highlight = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	special   = lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}
+
+	// Borders and boxes
+	boxStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(highlight).
+		Padding(1).
+		MarginBottom(1)
+
 	titleStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#FF75B7")).
+		Foreground(special).
+		MarginLeft(2).
 		MarginBottom(1).
-		SetString("distructions")
+		PaddingLeft(2).
+		SetString("✨ ")
 
 	itemStyle = lipgloss.NewStyle().
 		PaddingLeft(4)
 
 	selectedItemStyle = lipgloss.NewStyle().
-		PaddingLeft(2).
-		Foreground(lipgloss.Color("#FF75B7")).
-		SetString("→ ")
+		Bold(true).
+		Foreground(highlight).
+		PaddingLeft(2)
 
 	descriptionStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#666666")).
+		Foreground(subtle).
 		PaddingLeft(6)
+
+	footerStyle = lipgloss.NewStyle().
+		Foreground(subtle).
+		Align(lipgloss.Center).
+		MarginTop(1)
+
+	// Icons for different command types
+	icons = map[string]string{
+		"npm":    "📦",
+		"docker": "🐳",
+		"go":     "🚀",
+		"test":   "🧪",
+		"build":  "🔨",
+		"run":    "▶️ ",
+		"deploy": "🚀",
+	}
 )
 
 type PackageJSON struct {
@@ -287,27 +317,53 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n", m.err)
+		return boxStyle.Render(fmt.Sprintf("Error: %v", m.err))
 	}
 
 	if m.quitting {
-		return "Bye!\n"
+		return "Goodbye! 👋\n"
 	}
 
-	s := titleStyle.Render(m.config.ProjectName) + "\n\n"
-
+	// Build the title section
+	title := titleStyle.Render(m.config.ProjectName)
+	
+	// Build the commands section
+	var commands strings.Builder
 	for i, cmd := range m.config.Commands {
+		// Determine the icon based on command name
+		icon := "💫" // default icon
+		for key, specificIcon := range icons {
+			if strings.Contains(strings.ToLower(cmd.Name), key) {
+				icon = specificIcon
+				break
+			}
+		}
+
+		// Style the command entry
 		cursor := " "
 		if m.cursor == i {
-			cursor = selectedItemStyle.String()
+			cursor = "→"
+			commands.WriteString(selectedItemStyle.Render(
+				fmt.Sprintf("%s %s %s", cursor, icon, cmd.Name),
+			))
+		} else {
+			commands.WriteString(itemStyle.Render(
+				fmt.Sprintf("%s %s %s", cursor, icon, cmd.Name),
+			))
 		}
-		s += fmt.Sprintf("%s%s\n", cursor, itemStyle.Render(cmd.Name))
-		s += descriptionStyle.Render(cmd.Description) + "\n\n"
+		commands.WriteString("\n")
+		
+		// Add description with subtle styling
+		commands.WriteString(descriptionStyle.Render(cmd.Description))
+		commands.WriteString("\n\n")
 	}
 
-	s += "\nPress q to quit.\n"
+	// Build the footer
+	footer := footerStyle.Render("↑/↓: navigate • enter: run • q: quit")
 
-	return s
+	// Combine all sections in a box
+	content := fmt.Sprintf("%s\n%s\n%s", title, commands.String(), footer)
+	return boxStyle.Render(content)
 }
 
 func getRepoName() string {
