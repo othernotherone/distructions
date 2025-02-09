@@ -1,0 +1,25 @@
+{
+    "projectName": "My Awesome Project",
+    "commands": [
+        {
+            "name": "Run Development Server",
+            "command": "npm run dev",
+            "description": "Starts the development server on port 3000"
+        },
+        {
+            "name": "Run Tests",
+            "command": "npm test",
+            "description": "Runs the test suite"
+        },
+        {
+            "name": "Build",
+            "command": "npm run build",
+            "description": "Creates a production build"
+        },
+        {
+            "name": "Deploy",
+            "command": "npm run deploy",
+            "description": "Deploys to production"
+        }
+    ]
+} 
