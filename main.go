@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -93,7 +94,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Execute the selected command
 			if m.cursor < len(m.config.Commands) {
 				cmd := m.config.Commands[m.cursor].Command
-				return m, tea.ExecProcess(tea.NewExecCmd(cmd), nil)
+				return m, tea.ExecProcess(exec.Command("sh", "-c", cmd), nil)
 			}
 		}
 	}
