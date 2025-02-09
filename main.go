@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
+	"gopkg.in/yaml.v3"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -51,6 +54,158 @@ var (
 		PaddingLeft(6)
 )
 
+type PackageJSON struct {
+	Scripts map[string]string `json:"scripts"`
+}
+
+// ConfigGenerator handles detecting and generating config
+type ConfigGenerator struct {
+	projectRoot string
+}
+
+func NewConfigGenerator() *ConfigGenerator {
+	return &ConfigGenerator{
+		projectRoot: ".",
+	}
+}
+
+func (g *ConfigGenerator) Generate() error {
+	// Check if .project-commands.json already exists
+	if _, err := os.Stat(".project-commands.json"); err == nil {
+		return nil // Config already exists
+	}
+
+	config := Config{
+		ProjectName: filepath.Base(g.projectRoot),
+		Commands:    []Command{},
+	}
+
+	// Detect and add commands from various sources
+	g.detectNodeCommands(&config)
+	g.detectDockerCommands(&config)
+	g.detectGoCommands(&config)
+	// Add more detectors as needed
+
+	// Only save if we found any commands
+	if len(config.Commands) > 0 {
+		return g.saveConfig(config)
+	}
+
+	return nil
+}
+
+func (g *ConfigGenerator) detectNodeCommands(config *Config) {
+	data, err := os.ReadFile("package.json")
+	if err != nil {
+		return
+	}
+
+	var pkg PackageJSON
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return
+	}
+
+	for name, script := range pkg.Scripts {
+		config.Commands = append(config.Commands, Command{
+			Name:        fmt.Sprintf("npm: %s", name),
+			Command:     fmt.Sprintf("npm run %s", name),
+			Description: fmt.Sprintf("Run npm script: %s", script),
+		})
+	}
+}
+
+func (g *ConfigGenerator) detectDockerCommands(config *Config) {
+	files := []string{"docker-compose.yml", "docker-compose.yaml"}
+	var composeFile string
+	
+	for _, file := range files {
+		if _, err := os.Stat(file); err == nil {
+			composeFile = file
+			break
+		}
+	}
+
+	if composeFile == "" {
+		return
+	}
+
+	// Read docker-compose file to get service names
+	data, err := os.ReadFile(composeFile)
+	if err != nil {
+		return
+	}
+
+	var compose map[string]interface{}
+	if err := yaml.Unmarshal(data, &compose); err != nil {
+		return
+	}
+
+	services, ok := compose["services"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	// Add generic docker-compose commands
+	config.Commands = append(config.Commands,
+		Command{
+			Name:        "Docker: Start All",
+			Command:     "docker-compose up",
+			Description: "Start all Docker containers",
+		},
+		Command{
+			Name:        "Docker: Start All (Detached)",
+			Command:     "docker-compose up -d",
+			Description: "Start all Docker containers in detached mode",
+		},
+		Command{
+			Name:        "Docker: Stop All",
+			Command:     "docker-compose down",
+			Description: "Stop all Docker containers",
+		},
+	)
+
+	// Add service-specific commands
+	for serviceName := range services {
+		config.Commands = append(config.Commands,
+			Command{
+				Name:        fmt.Sprintf("Docker: Start %s", serviceName),
+				Command:     fmt.Sprintf("docker-compose up %s", serviceName),
+				Description: fmt.Sprintf("Start the %s service", serviceName),
+			},
+		)
+	}
+}
+
+func (g *ConfigGenerator) detectGoCommands(config *Config) {
+	if _, err := os.Stat("go.mod"); err == nil {
+		config.Commands = append(config.Commands,
+			Command{
+				Name:        "Go: Run",
+				Command:     "go run .",
+				Description: "Run the Go application",
+			},
+			Command{
+				Name:        "Go: Test",
+				Command:     "go test ./...",
+				Description: "Run all tests",
+			},
+			Command{
+				Name:        "Go: Build",
+				Command:     "go build",
+				Description: "Build the Go application",
+			},
+		)
+	}
+}
+
+func (g *ConfigGenerator) saveConfig(config Config) error {
+	data, err := json.MarshalIndent(config, "", "    ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(".project-commands.json", data, 0644)
+}
+
 func initialModel() Model {
 	config, err := loadConfig()
 	return Model{
@@ -61,6 +216,13 @@ func initialModel() Model {
 }
 
 func loadConfig() (Config, error) {
+	// Try to generate config if it doesn't exist
+	generator := NewConfigGenerator()
+	if err := generator.Generate(); err != nil {
+		return Config{}, err
+	}
+
+	// Now try to load the config (whether it existed before or was just generated)
 	data, err := os.ReadFile(".project-commands.json")
 	if err != nil {
 		return Config{}, err
