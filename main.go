@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"strings"
+	"bufio"
 )
 
 // Command represents a project command with description
@@ -216,14 +217,34 @@ func initialModel() Model {
 	}
 }
 
+func promptUser(message string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("\n%s (y/n): ", message)
+	response, _ := reader.ReadString('\n')
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes"
+}
+
 func loadConfig() (Config, error) {
-	// Try to generate config if it doesn't exist
-	generator := NewConfigGenerator()
-	if err := generator.Generate(); err != nil {
-		return Config{}, err
+	// Check if we're in a git repo first
+	if _, err := os.Stat(".git"); err != nil {
+		return Config{}, fmt.Errorf("not a git repository")
 	}
 
-	// Now try to load the config (whether it existed before or was just generated)
+	// Check if config exists
+	if _, err := os.Stat(".project-commands.json"); err != nil {
+		// Config doesn't exist - prompt user
+		if promptUser("No .project-commands.json found. Would you like to generate one?") {
+			generator := NewConfigGenerator()
+			if err := generator.Generate(); err != nil {
+				return Config{}, err
+			}
+		} else {
+			return Config{}, fmt.Errorf("config generation cancelled by user")
+		}
+	}
+
+	// Load the config (whether it existed or was just generated)
 	data, err := os.ReadFile(".project-commands.json")
 	if err != nil {
 		return Config{}, err
@@ -315,7 +336,15 @@ func getRepoName() string {
 func main() {
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error: %v", err)
+		if err.Error() == "config generation cancelled by user" {
+			fmt.Println("Cancelled by user. Run 'distructions' again if you change your mind!")
+			return
+		}
+		if err.Error() == "not a git repository" {
+			fmt.Println("Not a git repository. Distructions only works in git repositories.")
+			return
+		}
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 } 
